@@ -14,6 +14,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let _ = (scene as? UIWindowScene) else { return }
+        
+        let navigationController = window?.rootViewController as! UINavigationController
+        let locationsViewController = navigationController.topViewController as! LocationsViewController
+        locationsViewController.dataController = (UIApplication.shared.delegate as? AppDelegate)?.dataController
     }
 
     func sceneDidEnterBackground(_ scene: UIScene) {

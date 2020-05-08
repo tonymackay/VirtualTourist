@@ -9,6 +9,9 @@
 import UIKit
 
 class AlbumViewController: UIViewController {
+    
+    var dataController: DataController!
+    var pin: Pin!
 
     override func viewDidLoad() {
         super.viewDidLoad()
