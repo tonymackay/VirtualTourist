@@ -14,7 +14,7 @@ class PhotoCollectionViewCell: UICollectionViewCell {
     @IBOutlet weak var imageView: UIImageView!
 }
 
-class AlbumViewController: UIViewController {
+class AlbumViewController: UIViewController, NSFetchedResultsControllerDelegate {
     
     @IBOutlet weak var mapView: MKMapView!
     @IBOutlet weak var flowLayout: UICollectionViewFlowLayout!
@@ -57,7 +57,13 @@ class AlbumViewController: UIViewController {
     }
     
     @IBAction func newCollectionTapped(_ sender: Any) {
-        
+        print("newCollectionTapped")
+        let photosToDelete = fetchedResultsController.fetchedObjects ?? []
+        for photoToDelete in photosToDelete {
+            guard let indexPath = fetchedResultsController.indexPath(forObject: photoToDelete) else { break }
+            deletePhoto(indexPath: indexPath)
+        }
+        downloadAndStorePhotos()
     }
     
     func setupFetchedResultsController() {
@@ -91,8 +97,11 @@ class AlbumViewController: UIViewController {
     func downloadAndStorePhotos() {
         guard let photos = fetchedResultsController.fetchedObjects else { return }
         if photos.count == 0 {
-            print("no local photos - search for URLS on Flickr")
-            FlickrClient.search(latitude: pin.latitude, longitude: pin.longitude) { response, error in
+            
+            let page = Int(pin.page) + 1
+            print("no local photos - search for URLS on Flickr page \(page)")
+            
+            FlickrClient.search(latitude: pin.latitude, longitude: pin.longitude, page: page) { response, error in
                 guard let response = response else { return }
                 for photo in response.photos.photo {
                     let newPhoto = Photo(context: self.dataController.viewContext)
@@ -100,6 +109,7 @@ class AlbumViewController: UIViewController {
                     newPhoto.url = photo.url
                     newPhoto.pin = self.pin
                 }
+                self.pin.page = Int64(page)
                 self.dataController.saveContext()
             }
         } else {
@@ -111,6 +121,43 @@ class AlbumViewController: UIViewController {
         let photoToDelete = fetchedResultsController.object(at: indexPath)
         dataController.viewContext.delete(photoToDelete)
         dataController.saveContext()
+    }
+    
+    
+    var ops: [BlockOperation] = []
+
+    func controller(_ controller: NSFetchedResultsController<NSFetchRequestResult>, didChange anObject: Any, at indexPath: IndexPath?, for type: NSFetchedResultsChangeType, newIndexPath: IndexPath?) {
+        switch type {
+            case .insert:
+                ops.append(BlockOperation(block: { [weak self] in
+                    self?.collectionView.insertItems(at: [newIndexPath!])
+                }))
+            case .delete:
+                ops.append(BlockOperation(block: { [weak self] in
+                    self?.collectionView.deleteItems(at: [indexPath!])
+                }))
+            case .update:
+                ops.append(BlockOperation(block: { [weak self] in
+                    self?.collectionView.reloadItems(at: [indexPath!])
+                }))
+            case .move:
+                ops.append(BlockOperation(block: { [weak self] in
+                    self?.collectionView.moveItem(at: indexPath!, to: newIndexPath!)
+                }))
+            @unknown default:
+                break
+        }
+    }
+
+    func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
+        collectionView.performBatchUpdates({ () -> Void in
+            for op: BlockOperation in self.ops { op.start() }
+        }, completion: { (finished) -> Void in self.ops.removeAll() })
+    }
+
+    deinit {
+        for o in ops { o.cancel() }
+        ops.removeAll()
     }
 }
 
@@ -143,20 +190,5 @@ extension AlbumViewController: UICollectionViewDataSource, UICollectionViewDeleg
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath:IndexPath) {
         deletePhoto(indexPath: indexPath)
-    }
-}
-
-extension AlbumViewController: NSFetchedResultsControllerDelegate {
-    func controller(_ controller: NSFetchedResultsController<NSFetchRequestResult>, didChange anObject: Any, at indexPath: IndexPath?, for type: NSFetchedResultsChangeType, newIndexPath: IndexPath?) {
-        switch type {
-        case .insert:
-             collectionView.insertItems(at: [newIndexPath!])
-        case .delete:
-            collectionView.deleteItems(at: [indexPath!])
-        case .update:
-            collectionView.reloadItems(at: [indexPath!])
-        default:
-            print("action not implemented")
-        }
     }
 }
