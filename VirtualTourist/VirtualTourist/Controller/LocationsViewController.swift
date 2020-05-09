@@ -24,7 +24,7 @@ class LocationsViewController: UIViewController, MKMapViewDelegate {
         loadPins()
         
         let recognizer = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress))
-        recognizer.numberOfTapsRequired = 1
+        recognizer.numberOfTapsRequired = 0
         recognizer.minimumPressDuration = 2.0
         mapView.addGestureRecognizer(recognizer)
     }
