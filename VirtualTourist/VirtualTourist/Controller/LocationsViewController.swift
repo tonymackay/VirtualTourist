@@ -16,6 +16,7 @@ class LocationsViewController: UIViewController, MKMapViewDelegate {
     
     var dataController: DataController!
     var pins: [Pin] = []
+    let segueIdentifier = "albumSegue"
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -35,6 +36,15 @@ class LocationsViewController: UIViewController, MKMapViewDelegate {
     func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
         if let annotation = view.annotation {
             print("didSelect (Lat: \(annotation.coordinate.latitude) Long: \(annotation.coordinate.longitude)")
+            
+            // Get Pin to Pass then perform segue
+            for pin in pins {
+                if pin.latitude == annotation.coordinate.latitude && pin.longitude == annotation.coordinate.longitude {
+                    performSegue(withIdentifier: segueIdentifier, sender: pin)
+                    return
+                }
+            }
+            print("Warning: Could not Segue because Pin not found")
         }
     }
     
@@ -75,14 +85,18 @@ class LocationsViewController: UIViewController, MKMapViewDelegate {
         addPinToMap(latitude: coordinate.latitude, longitude: coordinate.longitude)
 
         let pin = Pin(context: dataController.viewContext)
+        pin.creationDate = Date()
         pin.longitude = coordinate.longitude
         pin.latitude = coordinate.latitude
         dataController.saveContext()
+        
+        pins.append(pin)
     }
     
     func loadPins() {
         let fetchRequest: NSFetchRequest<Pin> = Pin.fetchRequest()
-        //fetchRequest.sortDescriptors = []
+        let sortByDate: NSSortDescriptor = NSSortDescriptor(key: "creationDate", ascending: true)
+        fetchRequest.sortDescriptors = [sortByDate]
         if let result = try? dataController.viewContext.fetch(fetchRequest) {
             pins = result
             for pin in pins {
@@ -95,5 +109,14 @@ class LocationsViewController: UIViewController, MKMapViewDelegate {
         let annotation = MKPointAnnotation()
         annotation.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
         mapView.addAnnotation(annotation)
+    }
+    
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        guard let pin = sender as? Pin else { return }
+        // Inject Pin and DataController
+        if let vc = segue.destination as? AlbumViewController {
+            vc.dataController = dataController
+            vc.pin = pin
+        }
     }
 }
